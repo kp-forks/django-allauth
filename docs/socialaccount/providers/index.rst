@@ -94,6 +94,7 @@ Provider Specifics
    jupyterhub
    kakao
    keycloak
+   klaviyo
    lemonldap
    lichess
    line

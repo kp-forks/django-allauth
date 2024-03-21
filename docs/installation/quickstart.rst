@@ -105,6 +105,7 @@ the ``settings.py`` of your project::
         'allauth.socialaccount.providers.instagram',
         'allauth.socialaccount.providers.jupyterhub',
         'allauth.socialaccount.providers.kakao',
+        'allauth.socialaccount.providers.klaviyo',
         'allauth.socialaccount.providers.lemonldap',
         "allauth.socialaccount.providers.lichess",
         'allauth.socialaccount.providers.line',

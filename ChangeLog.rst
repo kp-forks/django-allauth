@@ -11,7 +11,7 @@
 Note worthy changes
 -------------------
 
-- ...
+- Added new socialaccount provider: Klaviyo.
 
 
 65.16.1 (2026-04-17)

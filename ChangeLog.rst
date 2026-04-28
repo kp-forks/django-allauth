@@ -17,6 +17,9 @@ Note worthy changes
   ``/64``) to prevent bypass via address rotation. Configurable via
   ``ALLAUTH_RATE_LIMIT_IPV6_PREFIX``.
 
+- Added ``authenticate_by_email`` hook to ``DefaultSocialAccountAdapter``,
+  allowing customization of user lookup and email matching during social login.
+
 
 Fixes
 -----

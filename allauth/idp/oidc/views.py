@@ -87,6 +87,9 @@ class ConfigurationView(View):
             "device_authorization_endpoint": build_absolute_uri(
                 request, reverse("idp:oidc:device_code")
             ),
+            "end_session_endpoint": build_absolute_uri(
+                request, reverse("idp:oidc:logout")
+            ),
             "id_token_signing_alg_values_supported": ["RS256"],
             "issuer": get_adapter().get_issuer(),
             "jwks_uri": build_absolute_uri(request, reverse("idp:oidc:jwks")),

@@ -13,6 +13,11 @@ Note worthy changes
 
 - Added new socialaccount provider: Klaviyo.
 
+- Rate limiting now truncates IPv6 addresses to their network prefix (default
+  ``/64``) to prevent bypass via address rotation. Configurable via
+  ``ALLAUTH_RATE_LIMIT_IPV6_PREFIX``.
+
+
 Fixes
 -----
 

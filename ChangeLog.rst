@@ -1,4 +1,4 @@
-65.17.0 (unreleased)
+65.17.0 (2026-05-20)
 ********************
 
 .. note::
@@ -27,6 +27,7 @@ Fixes
 - BitBucket: When using the BitBucket API, the token is passed in the headers
   instead of the query parameters, which no longer works since May 4th, 2026
   (`deprecation notice <https://developer.atlassian.com/cloud/bitbucket/changelog/#CHANGE-3052>`__).
+
 
 65.16.1 (2026-04-17)
 ********************

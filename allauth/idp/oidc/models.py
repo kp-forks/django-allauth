@@ -223,6 +223,9 @@ class Token(models.Model):
             return f"{self.get_type_display()} for user #{self.user_id}"
         return self.get_type_display()
 
+    def set_value(self, value: str) -> None:
+        self.hash = get_adapter().hash_token(value)
+
     def get_scopes(self) -> list[str]:
         return _values_from_text(self.scopes)
 

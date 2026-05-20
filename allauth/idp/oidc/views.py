@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from http import HTTPStatus
 from typing import Any
 
@@ -7,8 +8,9 @@ from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.sites.shortcuts import get_current_site
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.signing import BadSignature, Signer
+from django.db import transaction
 from django.http import (
     HttpRequest,
     HttpResponse,
@@ -32,7 +34,8 @@ from oauthlib.oauth2.rfc6749.errors import InvalidScopeError, OAuth2Error
 from allauth.account import app_settings as account_settings
 from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.internal.decorators import login_not_required
-from allauth.core.internal import jwkkit
+from allauth.core.exceptions import ImmediateHttpResponse
+from allauth.core.internal import jwkkit, ratelimit
 from allauth.core.internal.httpkit import (
     add_query_params,
     authenticated_user,
@@ -42,6 +45,7 @@ from allauth.idp.oidc import app_settings
 from allauth.idp.oidc.adapter import get_adapter
 from allauth.idp.oidc.forms import (
     AuthorizationForm,
+    ClientRegistrationForm,
     ConfirmCodeForm,
     DeviceAuthorizationForm,
     RPInitiatedLogoutForm,
@@ -55,7 +59,7 @@ from allauth.idp.oidc.internal.oauthlib.utils import (
     respond_html_error,
     respond_json_error,
 )
-from allauth.idp.oidc.models import Client
+from allauth.idp.oidc.models import Client, Token
 from allauth.utils import build_absolute_uri
 
 
@@ -102,6 +106,10 @@ class ConfigurationView(View):
             "userinfo_endpoint": userinfo_endpoint,
             "subject_types_supported": ["public"],
         }
+        if app_settings.DCR_ENABLED:
+            data["registration_endpoint"] = build_absolute_uri(
+                request, reverse("idp:oidc:client_registration")
+            )
         response = JsonResponse(data)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -540,3 +548,191 @@ class LogoutView(FormView):
 
 
 logout = LogoutView.as_view()
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+@method_decorator(login_not_required, name="dispatch")
+class ClientRegistrationView(View):
+
+    def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        bearer_token, token, resp = self._authorize()
+        if resp:
+            return resp
+
+        client_metadata = self._get_client_metadata()
+        if client_metadata is None:
+            return JsonResponse(
+                {
+                    "error": "invalid_client_metadata",
+                    "error_description": "Invalid JSON data.",
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        form = self.form = ClientRegistrationForm(data=client_metadata)
+        if not form.is_valid():
+            return self._form_invalid(form)
+        return self._form_valid(
+            form,
+            client_metadata=client_metadata,
+            bearer_token=bearer_token,
+            token=token,
+        )
+
+    @transaction.atomic
+    def _form_valid(
+        self,
+        form: ClientRegistrationForm,
+        *,
+        client_metadata: dict,
+        token: Token | None,
+        bearer_token: str | None,
+    ) -> HttpResponse:
+        client = form.save(commit=False)
+        client.data = {
+            "dcr": True,
+            "client_metadata": client_metadata,
+        }
+        secret = get_adapter().generate_client_secret()
+        client.set_secret(secret)
+
+        resp: HttpResponse | None
+        usage, resp = self._ratelimit()
+        if resp:
+            return resp
+        assert usage  # nosec
+        resp = self._perform_custom_validation(
+            client=client,
+            client_metadata=client_metadata,
+            token=token,
+            bearer_token=bearer_token,
+        )
+        if resp:
+            usage.rollback()
+            return resp
+
+        client.save()
+        return JsonResponse(
+            self._serialize_client(client, form, secret), status=HTTPStatus.CREATED
+        )
+
+    def _form_invalid(self, form: ClientRegistrationForm) -> JsonResponse:
+        error_fields = list(form.errors.keys())
+        if form.data and error_fields == ["redirect_uris"]:
+            error = "invalid_redirect_uri"
+        else:
+            error = "invalid_client_metadata"
+
+        if not form.data:
+            error_description = "Invalid data received."
+        else:
+            error_description = "  ".join(
+                [
+                    f"'{field}': {' '.join([str(err) for err in errs])}"
+                    for field, errs in form.errors.items()
+                ]
+            )
+        return JsonResponse(
+            {
+                "error": error,
+                "error_description": error_description,
+            },
+            status=HTTPStatus.BAD_REQUEST,
+        )
+
+    def _authorize(self) -> tuple[str | None, Token | None, HttpResponse | None]:
+        if not app_settings.DCR_REQUIRES_INITIAL_ACCESS_TOKEN:
+            return None, None, None
+        auth = self.request.headers.get("Authorization", "")
+        scheme, _, bearer_token = auth.partition(" ")
+        if scheme.lower() != "bearer" or not bearer_token:
+            return None, None, self._respond_unauthorized()
+        token = Token.objects.lookup(Token.Type.INITIAL_ACCESS_TOKEN, bearer_token)
+        if not token:
+            return None, None, self._respond_unauthorized()
+        return bearer_token, token, None
+
+    def _respond_unauthorized(self) -> HttpResponse:
+        resp = HttpResponse(status=HTTPStatus.UNAUTHORIZED)
+        resp["WWW-Authenticate"] = 'Bearer error="invalid_token"'
+        return resp
+
+    def _get_client_metadata(self) -> dict | None:
+        try:
+            data = json.loads(self.request.body)
+        except (json.JSONDecodeError, ValueError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        return data
+
+    def _ratelimit(self) -> tuple[ratelimit.RateLimitUsage | None, JsonResponse | None]:
+        usage = ratelimit.consume(
+            request=self.request,
+            config=app_settings.RATE_LIMITS,
+            action="client_registration",
+            raise_exception=False,
+        )
+        resp: JsonResponse | None = None
+        if not usage:
+            resp = JsonResponse(
+                {
+                    "error": "temporarily_unavailable",
+                    "error_description": "Too many requests.",
+                },
+                status=HTTPStatus.TOO_MANY_REQUESTS,
+            )
+        return usage, resp
+
+    def _perform_custom_validation(
+        self,
+        *,
+        client: Client,
+        client_metadata: dict,
+        token: Token | None,
+        bearer_token: str | None,
+    ) -> HttpResponse | None:
+        try:
+            get_adapter().validate_client_registration(
+                client=client,
+                client_metadata=client_metadata,
+                token=token,
+                bearer_token=bearer_token,
+            )
+        except ValidationError as e:
+            return JsonResponse(
+                {
+                    "error": "invalid_client_metadata",
+                    "error_description": str(e.message),
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        except ImmediateHttpResponse as e:
+            return e.response
+        return None
+
+    def _serialize_client(
+        self, client: Client, form: ClientRegistrationForm, secret: str
+    ) -> dict:
+        data = {
+            "client_id": client.id,
+            "client_name": client.name,
+            "token_endpoint_auth_method": form.cleaned_data[
+                "token_endpoint_auth_method"
+            ],
+            "scope": " ".join(client.get_scopes()),
+            "client_id_issued_at": int(client.created_at.timestamp()),
+            "redirect_uris": client.get_redirect_uris(),
+            "grant_types": client.get_grant_types(),
+            "response_types": client.get_response_types(),
+        }
+        if client.type == Client.Type.CONFIDENTIAL:
+            data.update(
+                {
+                    "client_secret": secret,
+                    "client_secret_expires_at": 0,  # nosec
+                }
+            )
+        return data
+
+
+client_registration = ClientRegistrationView.as_view()

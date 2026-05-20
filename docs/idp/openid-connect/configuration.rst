@@ -17,6 +17,15 @@ Available settings:
 ``IDP_OIDC_AUTHORIZATION_CODE_EXPIRES_IN`` (default: 60)
   The time (in seconds) after which authorization codes expire.
 
+``IDP_OIDC_DCR_ENABLED`` (default: ``False``)
+  Controls whether Dynamic Client Registration is enabled. When enabled, clients
+  can register themselves by POSTing to the registration endpoint.
+
+``IDP_OIDC_DCR_REQUIRES_INITIAL_ACCESS_TOKEN`` (default: ``True``)
+  When enabled, the DCR endpoint requires an initial access token in the
+  ``Authorization`` header (``Bearer <token>``). This limits registration to
+  previously authorized parties.
+
 ``IDP_OIDC_DEVICE_CODE_EXPIRES_IN`` (default: 300)
   The time (in seconds) after which device codes expire.
 
@@ -33,7 +42,7 @@ Available settings:
 ``IDP_OIDC_PRIVATE_KEY`` (default: ``""``)
   The private key used for creating ID tokens (and ``.well-known/jwks.json``).
 
-``IDP_OIDC_RATE_LIMITS`` (default: ``{"device_user_code": "5/m/ip"}``)
+``IDP_OIDC_RATE_LIMITS`` (default: ``{"device_user_code": "5/m/ip", "client_registration": "3/m/ip"}``)
   Rate limit configuration.
 
 ``IDP_OIDC_ROTATE_REFRESH_TOKEN`` (default: ``True``)

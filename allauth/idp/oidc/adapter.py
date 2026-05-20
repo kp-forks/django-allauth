@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Iterable
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
@@ -20,6 +20,10 @@ from allauth.core.internal.adapter import BaseAdapter
 from allauth.core.internal.cryptokit import generate_user_code
 from allauth.idp.oidc import app_settings
 from allauth.utils import import_attribute
+
+
+if TYPE_CHECKING:
+    from allauth.idp.oidc.models import Client, Token
 
 
 class DefaultOIDCAdapter(BaseAdapter):
@@ -156,6 +160,29 @@ class DefaultOIDCAdapter(BaseAdapter):
         if not user or not user.is_active:
             return None
         return user
+
+    def validate_client_registration(
+        self,
+        *,
+        client: Client,
+        client_metadata: dict,
+        token: Token | None,
+        bearer_token: str | None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        This method is called after all builtin validation was successful,
+        and just before the actual client is being created. To intervene, raise
+        a ``ValidationError`` or an ``ImmediateHttpResponse``.
+
+        ``client``: The ``Client`` instance that is about to be saved.
+        ``client_metadata``: The raw JSON payload from the DCR request.
+        ``token``: The ``Token`` instance corresponding to the initial access
+            token, or ``None`` if no token was provided.
+        ``bearer_token``: The raw bearer token string from the ``Authorization``
+            header, or ``None`` if no token was provided.
+        """
+        pass
 
 
 def get_adapter() -> DefaultOIDCAdapter:

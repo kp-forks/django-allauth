@@ -579,7 +579,7 @@ class ClientRegistrationView(View):
                 },
                 status=HTTPStatus.BAD_REQUEST,
             )
-        form = self.form = ClientRegistrationForm(data=client_metadata)
+        form = ClientRegistrationForm(data=client_metadata)
         if not form.is_valid():
             return self._form_invalid(form)
         return self._form_valid(

@@ -219,6 +219,14 @@ def test_rate_limits(register_client, enable_cache, settings):
                 "error_description": "'client_name': Ensure this value has at most 100 characters (it has 800).",
             },
         ),
+        (
+            "<script>alert(1)</script>",
+            HTTPStatus.BAD_REQUEST,
+            {
+                "error": "invalid_client_metadata",
+                "error_description": "'client_name': Client name must not contain '<' or '>'.",
+            },
+        ),
     ],
 )
 def test_validation_errors(register_client, client_name, result, status):

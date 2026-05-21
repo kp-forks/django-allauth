@@ -185,6 +185,12 @@ class ClientRegistrationForm(forms.Form):
     token_endpoint_auth_method = forms.CharField(required=False)
     scope = forms.CharField(required=False)
 
+    def clean_client_name(self) -> str:
+        value = self.cleaned_data.get("client_name") or ""
+        if "<" in value or ">" in value:
+            raise forms.ValidationError("Client name must not contain '<' or '>'.")
+        return value.strip()
+
     def _clean_string_list(self, field_name: str) -> list[str]:
         value = self.cleaned_data.get(field_name)
         if value is None:

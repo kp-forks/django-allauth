@@ -102,7 +102,11 @@ class ConfigurationView(View):
                 request, reverse("idp:oidc:revoke")
             ),
             "token_endpoint": build_absolute_uri(request, reverse("idp:oidc:token")),
-            "token_endpoint_auth_methods_supported": ["client_secret_post"],
+            "token_endpoint_auth_methods_supported": [
+                "none",
+                "client_secret_basic",
+                "client_secret_post",
+            ],
             "userinfo_endpoint": userinfo_endpoint,
             "subject_types_supported": ["public"],
         }

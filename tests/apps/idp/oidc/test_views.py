@@ -1,3 +1,4 @@
+import base64
 from http import HTTPStatus
 from unittest.mock import ANY
 from urllib.parse import parse_qs, urlparse
@@ -59,19 +60,30 @@ def test_userinfo(
 
 
 @pytest.mark.parametrize("access_token_format", ["jwt", "opaque"])
+@pytest.mark.parametrize("basic_auth", (False, True))
 def test_client_credentials(
-    client, oidc_client, oidc_client_secret, access_token_format, settings
+    client, oidc_client, oidc_client_secret, access_token_format, settings, basic_auth
 ):
     settings.IDP_OIDC_ACCESS_TOKEN_FORMAT = access_token_format
-    resp = client.post(
-        reverse("idp:oidc:token"),
-        data={
-            "client_id": oidc_client.id,
-            "client_secret": oidc_client_secret,
-            "scope": "profile email",
-            "grant_type": "client_credentials",
-        },
-    )
+    data = {
+        "scope": "profile email",
+        "grant_type": "client_credentials",
+    }
+    post_kwargs = {}
+    if not basic_auth:
+        data.update(
+            {
+                "client_id": oidc_client.id,
+                "client_secret": oidc_client_secret,
+            }
+        )
+    else:
+        credentials = base64.b64encode(
+            f"{oidc_client.id}:{oidc_client_secret}".encode()
+        ).decode()
+        post_kwargs = {"HTTP_AUTHORIZATION": f"Basic {credentials}"}
+
+    resp = client.post(reverse("idp:oidc:token"), data=data, **post_kwargs)
     assert resp.status_code == HTTPStatus.OK
     data = resp.json()
     assert data == {
@@ -95,6 +107,19 @@ def test_client_credentials(
             "scope": "profile email",
             "token_use": "access",
         }
+
+
+def test_client_secret_basic_invalid(client, oidc_client):
+    credentials = base64.b64encode(f"{oidc_client.id}:wrong-secret".encode()).decode()
+    resp = client.post(
+        reverse("idp:oidc:token"),
+        data={
+            "scope": "profile",
+            "grant_type": "client_credentials",
+        },
+        HTTP_AUTHORIZATION=f"Basic {credentials}",
+    )
+    assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 
 def test_password_grant_is_blocked(
@@ -201,7 +226,11 @@ def test_configuration_view(
             "revocation_endpoint": "http://testserver/identity/o/api/revoke",
             "subject_types_supported": ["public"],
             "token_endpoint": "http://testserver/identity/o/api/token",
-            "token_endpoint_auth_methods_supported": ["client_secret_post"],
+            "token_endpoint_auth_methods_supported": [
+                "none",
+                "client_secret_basic",
+                "client_secret_post",
+            ],
             "userinfo_endpoint": (
                 "https://remote/userinfo"
                 if custom_userinfo_endpoint

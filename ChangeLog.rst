@@ -11,7 +11,9 @@
 Note worthy changes
 -------------------
 
-- ...
+- IdP: Added support for Dynamic Client Registration.
+
+- IdP: Added support for ``client_secret_basic``.
 
 
 65.17.0 (2026-05-20)

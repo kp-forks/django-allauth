@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import uuid
 from datetime import timedelta
 from typing import Any
@@ -76,9 +77,25 @@ class OAuthLibRequestValidator(RequestValidator):
         self._use_client(request, client)
         return True
 
+    def _extract_basic_auth(self, request) -> tuple[str | None, str | None]:
+        auth = request.headers.get("Authorization", "")
+        scheme, _, credentials = auth.partition(" ")
+        if scheme.lower() != "basic" or not credentials:
+            return None, None
+        try:
+            decoded = base64.b64decode(credentials).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None, None
+        client_id, _, client_secret = decoded.partition(":")
+        if not client_id or not client_secret:
+            return None, None
+        return client_id, client_secret
+
     def authenticate_client(self, request, *args, **kwargs) -> bool:
-        client_id = getattr(request, "client_id", None)
-        client_secret = getattr(request, "client_secret", None)
+        client_id, client_secret = self._extract_basic_auth(request)
+        if not client_id and not client_secret:
+            client_id = getattr(request, "client_id", None)
+            client_secret = getattr(request, "client_secret", None)
         if not isinstance(client_id, str):
             return False
         if not client_secret and request.grant_type == Client.GrantType.DEVICE_CODE:

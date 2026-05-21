@@ -28,6 +28,12 @@ The above will enable the following views:
   authentication requests and issues authorization codes or tokens based on the
   request parameters.
 
+``/identity/o/api/clients``
+  The Dynamic Client Registration (`RFC 7591
+  <https://www.rfc-editor.org/rfc/rfc7591>`_) endpoint. Allows clients to
+  register themselves by POSTing their metadata. Only available when
+  ``IDP_OIDC_DCR_ENABLED`` is set to ``True``.
+
 ``/identity/o/api/revoke``
   Allows clients to revoke access or refresh tokens. This endpoint helps
   maintain security by invalidating credentials that are no longer needed or

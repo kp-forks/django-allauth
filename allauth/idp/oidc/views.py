@@ -84,10 +84,12 @@ class ConfigurationView(View):
             userinfo_endpoint = build_absolute_uri(
                 request, reverse("idp:oidc:userinfo")
             )
+        supported_types = self._get_supported_types()
         data = {
             "authorization_endpoint": build_absolute_uri(
                 request, reverse("idp:oidc:authorization")
             ),
+            "code_challenge_methods_supported": ["S256"],
             "device_authorization_endpoint": build_absolute_uri(
                 request, reverse("idp:oidc:device_code")
             ),
@@ -97,7 +99,6 @@ class ConfigurationView(View):
             "id_token_signing_alg_values_supported": ["RS256"],
             "issuer": get_adapter().get_issuer(),
             "jwks_uri": build_absolute_uri(request, reverse("idp:oidc:jwks")),
-            "response_types_supported": self._get_response_types_supported(),
             "revocation_endpoint": build_absolute_uri(
                 request, reverse("idp:oidc:revoke")
             ),
@@ -109,6 +110,7 @@ class ConfigurationView(View):
             ],
             "userinfo_endpoint": userinfo_endpoint,
             "subject_types_supported": ["public"],
+            **supported_types,
         }
         if app_settings.DCR_ENABLED:
             data["registration_endpoint"] = build_absolute_uri(
@@ -118,11 +120,16 @@ class ConfigurationView(View):
         response["Access-Control-Allow-Origin"] = "*"
         return response
 
-    def _get_response_types_supported(self) -> list[str]:
+    def _get_supported_types(self) -> dict[str, list[str]]:
+        grant_types = set()
         response_types = set()
-        for client in Client.objects.only("response_types").iterator():
+        for client in Client.objects.only("response_types", "grant_types").iterator():
             response_types.update(client.get_response_types())
-        return list(sorted(response_types))
+            grant_types.update(client.get_grant_types())
+        return {
+            "grant_types_supported": list(sorted(grant_types)),
+            "response_types_supported": list(sorted(response_types)),
+        }
 
 
 configuration = ConfigurationView.as_view()

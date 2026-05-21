@@ -236,6 +236,13 @@ def test_configuration_view(
                 if custom_userinfo_endpoint
                 else "http://testserver/identity/o/api/userinfo"
             ),
+            "code_challenge_methods_supported": ["S256"],
+            "grant_types_supported": [
+                "authorization_code",
+                "client_credentials",
+                "refresh_token",
+                "urn:ietf:params:oauth:grant-type:device_code",
+            ],
         }
 
 

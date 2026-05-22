@@ -5,7 +5,7 @@ from django.http import HttpRequest
 from ninja.security.base import AuthBase
 
 from allauth.idp.oidc.internal.oauthlib.server import get_server
-from allauth.idp.oidc.internal.oauthlib.utils import extract_params
+from allauth.idp.oidc.internal.oauthlib.utils import extract_params, get_context
 from allauth.idp.oidc.internal.scope import is_scope_granted
 
 
@@ -37,8 +37,9 @@ class TokenAuth(AuthBase):
         valid, ctx = server.verify_request(*orequest, scopes=[])
         if not valid:
             return None
-        if not is_scope_granted(self.scope, ctx.access_token, request.method):
+        access_token = get_context(ctx).access_token
+        if not is_scope_granted(self.scope, access_token, request.method):
             return None
-        if ctx.access_token and ctx.access_token.user:
-            request.user = ctx.access_token.user
-        return ctx.access_token
+        if access_token and access_token.user:
+            request.user = access_token.user
+        return access_token

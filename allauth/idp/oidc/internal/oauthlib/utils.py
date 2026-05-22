@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
+from django.core.exceptions import PermissionDenied
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from oauthlib.common import quote, urlencode, urlencoded
+from oauthlib.common import Request, quote, urlencode, urlencoded
 from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
 from allauth.account import app_settings as account_settings
+
+
+if TYPE_CHECKING:
+    from allauth.idp.oidc.models import Client, Token
 
 
 def get_uri(request: HttpRequest) -> str:
@@ -83,3 +90,35 @@ def respond_json_error(request: HttpRequest, error: OAuth2Error) -> HttpResponse
     for k, v in error.headers.items():
         response[k] = v
     return response
+
+
+@dataclass
+class ValidationContext:
+    email: str | None = None
+    access_token: Token | None = None
+    refresh_token: Token | None = None
+    clients: dict[str, Client | None] = field(default_factory=dict)
+    codes: dict[tuple[str, str], dict | None] = field(default_factory=dict)
+
+
+def get_context(request: Request) -> ValidationContext:
+    """
+    oathlib documents `Request` as:
+
+    > A malleable representation of a signable HTTP request
+
+    Within allauth, as part of request validation, we need to collect various state.
+    When assigning using `request.foo = ...`, we are at risk of mixing `foo` as a local
+    state variable vs a `?foo="bar"` get parameter. Therefore, we put our own variables
+    in a separate validation context.
+    """
+    key = "_allauth_context"
+    ctx = getattr(request, key, None)
+    if key in request._params or (
+        ctx is not None and not isinstance(ctx, ValidationContext)
+    ):
+        raise PermissionDenied
+    if ctx is None:
+        ctx = ValidationContext()
+        setattr(request, key, ctx)
+    return ctx

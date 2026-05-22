@@ -1,12 +1,12 @@
 import time
 import uuid
 from datetime import timedelta
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from django.utils import timezone
 
 import pytest
+from oauthlib.common import Request
 
 from allauth.core.context import request_context
 from allauth.idp.oidc.adapter import get_adapter
@@ -51,7 +51,10 @@ def device_client(db):
 def id_token_generator(rf):
     def f(client, user):
         with request_context(rf.get("/")):
-            request = SimpleNamespace(client=client, user=user, scopes=["openid"])
+            request = Request("/")
+            request.scopes = ["openid"]
+            request.user = user
+            request.client = client
             return OAuthLibRequestValidator().finalize_id_token(
                 {
                     "aud": client.id,

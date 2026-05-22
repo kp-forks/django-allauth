@@ -5,7 +5,7 @@ from django.http import HttpRequest
 from rest_framework.authentication import BaseAuthentication
 
 from allauth.idp.oidc.internal.oauthlib.server import get_server
-from allauth.idp.oidc.internal.oauthlib.utils import extract_params
+from allauth.idp.oidc.internal.oauthlib.utils import extract_params, get_context
 
 
 class TokenAuthentication(BaseAuthentication):
@@ -19,4 +19,5 @@ class TokenAuthentication(BaseAuthentication):
         valid, ctx = server.verify_request(*orequest, scopes=[])
         if not valid:
             return None
-        return ctx.user, ctx.access_token
+        access_token = get_context(ctx).access_token
+        return ctx.user, access_token

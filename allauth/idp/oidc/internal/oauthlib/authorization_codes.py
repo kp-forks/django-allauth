@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from django.core.cache import cache
 
+from oauthlib.common import Request
+
 from allauth.account.models import EmailAddress
 from allauth.idp.oidc import app_settings
 from allauth.idp.oidc.adapter import get_adapter
+from allauth.idp.oidc.internal.oauthlib.utils import get_context
 from allauth.idp.oidc.models import Client
 
 
@@ -12,7 +15,7 @@ def cache_key(client_id: str, code: str) -> str:
     return f"allauth.idp.oidc.authorization_code[{client_id}:{code}]"
 
 
-def create(client: Client, code: dict, request) -> None:
+def create(client: Client, code: dict, request: Request) -> None:
     adapter = get_adapter()
     authorization_code = {
         "code": code,
@@ -48,7 +51,8 @@ def invalidate(client_id: str, code: str) -> None:
     cache.delete(cache_key(client_id, code))
 
 
-def validate(client_id: str, code: str, request) -> bool:
+def validate(client_id: str, code: str, request: Request) -> bool:
+    ctx = get_context(request)
     authorization_code = lookup(client_id, code)
     if not authorization_code:
         return False
@@ -62,5 +66,5 @@ def validate(client_id: str, code: str, request) -> bool:
         request.code_challenge = pkce["code_challenge"]
         request.code_challenge_method = pkce["code_challenge_method"]
     request.claims = authorization_code["claims"]
-    request.email = authorization_code.get("email")
+    ctx.email = authorization_code.get("email")
     return True

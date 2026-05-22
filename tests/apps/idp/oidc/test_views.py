@@ -59,16 +59,33 @@ def test_userinfo(
         assert "email" not in data
 
 
+@pytest.mark.parametrize(
+    "resources",
+    [
+        [],
+        ["https://api.example.com/a"],
+        ["https://api.example.com/a", "https://api.example.com/b"],
+    ],
+)
 @pytest.mark.parametrize("access_token_format", ["jwt", "opaque"])
 @pytest.mark.parametrize("basic_auth", (False, True))
 def test_client_credentials(
-    client, oidc_client, oidc_client_secret, access_token_format, settings, basic_auth
+    client,
+    oidc_client,
+    oidc_client_secret,
+    access_token_format,
+    settings,
+    basic_auth,
+    resources,
 ):
     settings.IDP_OIDC_ACCESS_TOKEN_FORMAT = access_token_format
     data = {
         "scope": "profile email",
         "grant_type": "client_credentials",
     }
+    if resources:
+        data["resource"] = resources
+
     post_kwargs = {}
     if not basic_auth:
         data.update(
@@ -95,10 +112,11 @@ def test_client_credentials(
     token = Token.objects.lookup(Token.Type.ACCESS_TOKEN, data["access_token"])
     assert token.client == oidc_client
     assert token.get_scopes() == ["profile", "email"]
+    assert set(token.get_resources()) == set(resources)
 
     if access_token_format == "jwt":
         decoded = jwt.decode(data["access_token"], options={"verify_signature": False})
-        assert decoded == {
+        expected_decoded = {
             "client_id": oidc_client.id,
             "exp": ANY,
             "iat": ANY,
@@ -107,6 +125,9 @@ def test_client_credentials(
             "scope": "profile email",
             "token_use": "access",
         }
+        if resources:
+            expected_decoded["aud"] = resources
+        assert decoded == expected_decoded
 
 
 def test_client_secret_basic_invalid(client, oidc_client):
@@ -145,22 +166,29 @@ def test_password_grant_is_blocked(
     }
 
 
-def test_implicit_grant_flow(auth_client, user, oidc_client, enable_cache):
+@pytest.mark.parametrize(
+    "resources",
+    [
+        [],
+        ["https://api.example.com/a"],
+        ["https://api.example.com/a", "https://api.example.com/b"],
+    ],
+)
+def test_implicit_grant_flow(auth_client, user, oidc_client, enable_cache, resources):
     redirect_uri = oidc_client.get_redirect_uris()[0]
     scopes = ["openid", "profile"]
+    data = {
+        "client_id": oidc_client.id,
+        "response_type": "token",
+        "scope": " ".join(scopes),
+        "nonce": "some-nonce",
+        "state": "some-state",
+        "redirect_uri": redirect_uri,
+    }
+    if resources:
+        data["resource"] = resources
     resp = auth_client.get(
-        reverse("idp:oidc:authorization")
-        + "?"
-        + urlencode(
-            {
-                "client_id": oidc_client.id,
-                "response_type": "token",
-                "scope": " ".join(scopes),
-                "nonce": "some-nonce",
-                "state": "some-state",
-                "redirect_uri": redirect_uri,
-            }
-        )
+        reverse("idp:oidc:authorization") + "?" + urlencode(data, doseq=True)
     )
     assert resp.status_code == HTTPStatus.OK
     assertTemplateUsed(resp, "idp/oidc/authorization_form.html")
@@ -183,6 +211,8 @@ def test_implicit_grant_flow(auth_client, user, oidc_client, enable_cache):
         "token_type": ["Bearer"],
         "state": ["some-state"],
     }
+    token = Token.objects.lookup(Token.Type.ACCESS_TOKEN, data["access_token"][0])
+    assert set(token.get_resources()) == set(resources)
 
 
 def test_userinfo_access_token_as_query(

@@ -20,7 +20,11 @@ from allauth.idp.oidc.internal.clientkit import (
     is_redirect_uri_allowed,
 )
 from allauth.idp.oidc.internal.oauthlib import authorization_codes
-from allauth.idp.oidc.internal.oauthlib.utils import get_context
+from allauth.idp.oidc.internal.oauthlib.utils import (
+    ValidatorContext,
+    get_validator_context,
+)
+from allauth.idp.oidc.internal.resources import InvalidTargetError, is_resources_subset
 from allauth.idp.oidc.internal.tokens import decode_jwt_token
 from allauth.idp.oidc.models import Client, Token
 
@@ -150,53 +154,80 @@ class OAuthLibRequestValidator(RequestValidator):
         > invalid or expires, or to obtain additional access tokens with identical or
         > narrower scope
         """
-        adapter = get_adapter()
+        ctx = get_validator_context()
         refresh_token = token.get("refresh_token")
-        ctx = get_context(request)
-        email = ctx.email
         tokens = []
         if refresh_token:
-            refresh_token_hash = adapter.hash_token(refresh_token)
-            rt = ctx.refresh_token
-            if rt and not email and "email" in request.scopes:
-                email = rt.get_scope_email()
-            if (
-                rt
-                and not app_settings.ROTATE_REFRESH_TOKEN
-                and refresh_token_hash == rt.hash
-            ):
-                # We reuse our token.
-                pass
-            else:
-                if rt:
-                    # If we have an existing refresh token, drop it, because of:
-                    assert (
-                        app_settings.ROTATE_REFRESH_TOKEN
-                        or refresh_token_hash != rt.hash
-                    )  # nosec[assert_used]
-                    rt.delete()
-                tokens.append(
-                    Token(
-                        client=request.client,
-                        user=request.user,
-                        type=Token.Type.REFRESH_TOKEN,
-                        hash=refresh_token_hash,
-                    )
-                )
-        tokens.append(
-            Token(
-                client=request.client,
-                user=request.user,
-                type=Token.Type.ACCESS_TOKEN,
-                hash=adapter.hash_token(token["access_token"]),
-                expires_at=timezone.now() + timedelta(seconds=token["expires_in"]),
-            )
-        )
+            rt = self._prep_refresh_token(ctx, refresh_token, request)
+            if not rt.pk:
+                tokens.append(rt)
+        access_token = self._prep_access_token(ctx, token, request)
+        tokens.append(access_token)
         for t in tokens:
             t.set_scopes(request.scopes)
-            if email:
-                t.set_scope_email(email)
+            if ctx.email:
+                t.set_scope_email(ctx.email)
         Token.objects.bulk_create(tokens)
+
+    def _prep_access_token(
+        self, ctx: ValidatorContext, token: dict, request: Request
+    ) -> Token:
+        adapter = get_adapter()
+        access_token = Token(
+            client=request.client,
+            user=request.user,
+            type=Token.Type.ACCESS_TOKEN,
+            hash=adapter.hash_token(token["access_token"]),
+            expires_at=timezone.now() + timedelta(seconds=token["expires_in"]),
+        )
+        if resources := ctx.requested_resources:
+            if not is_resources_subset(resources, ctx.granted_resources):
+                raise InvalidTargetError
+        else:
+            resources = ctx.granted_resources
+        if resources:
+            access_token.set_resources(resources)
+        return access_token
+
+    def _prep_refresh_token(
+        self, ctx: ValidatorContext, refresh_token: str, request: Request
+    ) -> Token:
+        adapter = get_adapter()
+        refresh_token_hash = adapter.hash_token(refresh_token)
+        rt: Token | None = ctx.refresh_token
+        if rt:
+            ctx.granted_resources = rt.get_resources()
+            if not ctx.email and "email" in request.scopes:
+                ctx.email = rt.get_scope_email()
+        if (
+            rt
+            and not app_settings.ROTATE_REFRESH_TOKEN
+            and refresh_token_hash == rt.hash
+        ):
+            # We reuse our token.
+            return rt
+
+        resources: list[str] | None
+        if rt:
+            resources = rt.get_resources()
+            # If we have an existing refresh token, drop it, because of:
+            assert (
+                app_settings.ROTATE_REFRESH_TOKEN or refresh_token_hash != rt.hash
+            )  # nosec[assert_used]
+            rt.delete()
+            rt = None
+        else:
+            resources = ctx.granted_resources
+        new_rt = Token(
+            client=request.client,
+            user=request.user,
+            type=Token.Type.REFRESH_TOKEN,
+            hash=refresh_token_hash,
+        )
+        if resources:
+            new_rt.set_resources(resources)
+        rt = new_rt
+        return rt
 
     def invalidate_authorization_code(
         self, client_id, code, request: Request, *args, **kwargs
@@ -285,7 +316,7 @@ class OAuthLibRequestValidator(RequestValidator):
         id_token["iss"] = adapter.get_issuer()
         id_token["exp"] = id_token["iat"] + app_settings.ID_TOKEN_EXPIRES_IN
         id_token["jti"] = uuid.uuid4().hex
-        ctx = get_context(request)
+        ctx = get_validator_context()
         email = ctx.email
         id_token.update(
             adapter.get_claims(
@@ -320,7 +351,7 @@ class OAuthLibRequestValidator(RequestValidator):
             return False
         self._use_client(request, instance.client)
         request.scopes = granted_scopes
-        get_context(request).access_token = instance
+        get_validator_context().access_token = instance
         request.access_token = token
         return True
 
@@ -334,7 +365,7 @@ class OAuthLibRequestValidator(RequestValidator):
         Token.objects.by_value(token).filter(type__in=types).delete()
 
     def get_userinfo_claims(self, request: Request) -> dict:
-        access_token = get_context(request).access_token
+        access_token = get_validator_context().access_token
         assert access_token  # nosec
         email = access_token.get_scope_email()
         return get_adapter().get_claims(
@@ -381,13 +412,13 @@ class OAuthLibRequestValidator(RequestValidator):
         if not token.user or not token.user.is_active:
             return False
         request.user = token.user
-        get_context(request).refresh_token = token
+        get_validator_context().refresh_token = token
         return True
 
     def get_original_scopes(
         self, refresh_token, request: Request, *args, **kwargs
     ) -> list[str]:
-        rt = get_context(request).refresh_token
+        rt = get_validator_context().refresh_token
         assert rt is not None  # nosec
         return rt.get_scopes()
 
@@ -412,7 +443,7 @@ class OAuthLibRequestValidator(RequestValidator):
         were to set request.client, whether that could have adverse side
         effects. So, don't assign request.client here.
         """
-        cache = get_context(request).clients
+        cache = get_validator_context().clients
         if client_id in cache:
             client = cache[client_id]
         else:
@@ -427,7 +458,7 @@ class OAuthLibRequestValidator(RequestValidator):
     def _lookup_authorization_code(
         self, request: Request, client_id: str, code: str
     ) -> dict | None:
-        cache = get_context(request).codes
+        cache = get_validator_context().codes
         key = (client_id, code)
         if key in cache:
             authorization_code = cache[key]

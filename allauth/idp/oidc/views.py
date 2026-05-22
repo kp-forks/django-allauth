@@ -28,6 +28,7 @@ from django.views.decorators.clickjacking import xframe_options_deny
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.edit import FormView
 
+from oauthlib.common import Request
 from oauthlib.oauth2.rfc6749 import errors
 from oauthlib.oauth2.rfc6749.errors import InvalidScopeError, OAuth2Error
 
@@ -56,9 +57,11 @@ from allauth.idp.oidc.internal.oauthlib.server import get_device_server, get_ser
 from allauth.idp.oidc.internal.oauthlib.utils import (
     convert_response,
     extract_params,
+    get_validator_context,
     respond_html_error,
     respond_json_error,
 )
+from allauth.idp.oidc.internal.resources import get_resources
 from allauth.idp.oidc.models import Client, Token
 from allauth.utils import build_absolute_uri
 
@@ -152,6 +155,7 @@ class AuthorizationView(FormView):
             self._scopes, self._request_info = server.validate_authorization_request(
                 *orequest
             )
+            self._request_info["resources"] = get_resources(request)
             if "none" in self._request_info.get("prompt", ()):
                 oresponse = server.create_authorization_response(
                     *orequest, scopes=self._scopes
@@ -159,7 +163,7 @@ class AuthorizationView(FormView):
                 return convert_response(*oresponse)
 
         # Errors that should be shown to the user on the provider website
-        except errors.FatalClientError as e:
+        except (errors.FatalClientError, ValidationError) as e:
             return respond_html_error(request, error=e)
         except errors.OAuth2Error as e:
             return HttpResponseRedirect(e.in_uri(e.redirect_uri))
@@ -260,13 +264,21 @@ class AuthorizationView(FormView):
 
     def form_valid(self, form) -> HttpResponse:
         orequest = extract_params(self.request)
+
         scopes = form.cleaned_data["scopes"]
+
+        # oauthlib puts all credentials into its `Request`.
         credentials = {"user": self.request.user}
         credentials.update(self._request_info)
+        credentials.pop("resources", None)
+
+        ctx = get_validator_context()
+        ctx.requested_resources = self._request_info.get("resources")
+
         try:
             email = form.cleaned_data.get("email")
             if email:
-                credentials["email"] = email
+                ctx.email = email
             oresponse = get_server().create_authorization_response(
                 *orequest, scopes=scopes, credentials=credentials
             )
@@ -295,6 +307,7 @@ class DeviceCodeView(View):
     def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
         orequest = extract_params(request)
         try:
+            get_validator_context().requested_resources = get_resources(request)
             headers, data, status = (
                 get_device_server().create_device_authorization_response(*orequest)
             )
@@ -380,10 +393,17 @@ device_authorization = DeviceAuthorizationView.as_view()
 @method_decorator(login_not_required, name="dispatch")
 class TokenView(View):
 
+    @transaction.atomic
     def post(self, request: HttpRequest) -> HttpResponse:
-        if request.POST.get("grant_type") == Client.GrantType.DEVICE_CODE:
-            return self._post_device_token(request)
-        return self._create_token_response(request)
+        try:
+            get_validator_context().requested_resources = get_resources(request)
+            if request.POST.get("grant_type") == Client.GrantType.DEVICE_CODE:
+                return self._post_device_token(request)
+            return self._create_token_response(request)
+        except OAuth2Error as e:
+            resp = JsonResponse(dict(e.twotuples))
+            resp.status_code = e.status_code
+            return resp
 
     def _create_token_response(
         self,
@@ -394,12 +414,12 @@ class TokenView(View):
     ) -> HttpResponse:
         orequest = extract_params(request)
         oresponse = get_server(
-            pre_token=[lambda orequest: self._pre_token(orequest, user, data)]
+            pre_token=[lambda orequest: self._pre_token(orequest, user, data)],
         ).create_token_response(*orequest)
         return convert_response(*oresponse)
 
     def _pre_token(
-        self, orequest, user: AbstractBaseUser | None, data: dict | None
+        self, orequest: Request, user: AbstractBaseUser | None, data: dict | None
     ) -> None:
         if orequest.grant_type == Client.GrantType.DEVICE_CODE:
             assert user is not None  # nosec

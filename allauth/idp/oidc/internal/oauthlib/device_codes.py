@@ -22,6 +22,7 @@ from oauthlib.oauth2.rfc8628.errors import (
 from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.internal.userkit import str_to_user_id, user_id_to_str
 from allauth.core.internal.cryptokit import compare_user_code
+from allauth.idp.oidc.internal.oauthlib.utils import get_validator_context
 from allauth.idp.oidc.models import Client
 
 
@@ -34,6 +35,7 @@ def cache_device_code_key(device_code: str) -> str:
 
 
 def create(client_id: str, scope: list[str] | None, data: dict) -> None:
+    ctx = get_validator_context()
     cache.set(
         cache_user_code_key(data["user_code"]),
         data["device_code"],
@@ -48,6 +50,7 @@ def create(client_id: str, scope: list[str] | None, data: dict) -> None:
             "client_id": client_id,
             "scope": scope,
             "device": data,
+            "resources": ctx.requested_resources,
         },
         timeout=data["expires_in"],
     )
@@ -130,4 +133,6 @@ def poll_device_code(
     user = get_user_model().objects.filter(pk=str_to_user_id(data["user"])).first()
     if user is None or not user.is_active:
         raise AccessDenied
+    ctx = get_validator_context()
+    ctx.granted_resources = data["resources"]
     return user, data

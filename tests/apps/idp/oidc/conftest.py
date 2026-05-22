@@ -70,11 +70,11 @@ def id_token_generator(rf):
 
 @pytest.fixture
 def access_token_generator(access_token_format, rf):
-    def f(client, user, scopes=["openid"]):
+    def f(client, user, scopes=["openid"], resources=None):
         if access_token_format == "jwt":
-            o_request = MagicMock()
+            o_request = Request("/")
             o_request.user = user
-            o_request.client.id = client.id
+            o_request.client = client
             request = rf.get("/")
             request.user = user
             with request_context(request):
@@ -89,6 +89,8 @@ def access_token_generator(access_token_format, rf):
             hash=token_hash,
         )
         instance.set_scopes(scopes)
+        if resources:
+            instance.set_resources(resources)
         instance.save()
         return token, instance
 

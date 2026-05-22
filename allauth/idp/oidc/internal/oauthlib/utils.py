@@ -4,18 +4,20 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
 
-from django.core.exceptions import PermissionDenied
 from django.forms import Form
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
-from oauthlib.common import Request, quote, urlencode, urlencoded
+from oauthlib.common import quote, urlencode, urlencoded
 from oauthlib.oauth2.rfc6749.errors import OAuth2Error
 
 from allauth.account import app_settings as account_settings
+from allauth.core import context
 
 
 if TYPE_CHECKING:
+    from django.core.exceptions import ValidationError
+
     from allauth.idp.oidc.models import Client, Token
 
 
@@ -72,7 +74,7 @@ def convert_response(headers, body, status) -> HttpResponse:
 def respond_html_error(
     request: HttpRequest,
     *,
-    error: OAuth2Error | None = None,
+    error: OAuth2Error | ValidationError | None = None,
     form: Form | None = None,
 ) -> HttpResponse:
     context = {"error": error, "error_form": form}
@@ -93,15 +95,17 @@ def respond_json_error(request: HttpRequest, error: OAuth2Error) -> HttpResponse
 
 
 @dataclass
-class ValidationContext:
+class ValidatorContext:
     email: str | None = None
     access_token: Token | None = None
     refresh_token: Token | None = None
     clients: dict[str, Client | None] = field(default_factory=dict)
     codes: dict[tuple[str, str], dict | None] = field(default_factory=dict)
+    requested_resources: list[str] | None = None
+    granted_resources: list[str] | None = None
 
 
-def get_context(request: Request) -> ValidationContext:
+def get_validator_context() -> ValidatorContext:
     """
     oathlib documents `Request` as:
 
@@ -112,13 +116,9 @@ def get_context(request: Request) -> ValidationContext:
     state variable vs a `?foo="bar"` get parameter. Therefore, we put our own variables
     in a separate validation context.
     """
-    key = "_allauth_context"
-    ctx = getattr(request, key, None)
-    if key in request._params or (
-        ctx is not None and not isinstance(ctx, ValidationContext)
-    ):
-        raise PermissionDenied
+    key = "_oauthlib_request_validator_context"
+    ctx = getattr(context.request, key, None)
     if ctx is None:
-        ctx = ValidationContext()
-        setattr(request, key, ctx)
+        ctx = ValidatorContext()
+        setattr(context.request, key, ctx)
     return ctx

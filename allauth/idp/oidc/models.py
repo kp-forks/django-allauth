@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
@@ -250,3 +252,20 @@ class Token(models.Model):
         if not isinstance(self.data, dict):
             return None
         return self.data.get("email")
+
+    def get_resources(self) -> list[str]:
+        if not isinstance(self.data, dict):
+            return []
+        resources = self.data.get("resources")
+        if not isinstance(resources, list) or not all(
+            isinstance(res, str) for res in resources
+        ):
+            return []
+        return resources
+
+    def set_resources(self, resources: Iterable[str]) -> None:
+        if self.data is None:
+            self.data = {}
+        if not isinstance(self.data, dict):
+            raise ValueError
+        self.data["resources"] = list(resources)

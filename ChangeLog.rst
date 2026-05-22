@@ -15,6 +15,8 @@ Note worthy changes
 
 - IdP: Added support for ``client_secret_basic``.
 
+- IdP: Added support for Resource Indicators (RFC 8707).
+
 
 65.17.0 (2026-05-20)
 ********************

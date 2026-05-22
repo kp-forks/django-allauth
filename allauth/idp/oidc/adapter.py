@@ -184,6 +184,13 @@ class DefaultOIDCAdapter(BaseAdapter):
         """
         pass
 
+    def validate_resource_uris(self, *, uris: list[str], **kwargs: Any) -> None:
+        """
+        Allows for custom validation of resource URIs (RFC 8707).
+        Throw a ``ValidationError`` to reject the resource.
+        """
+        pass
+
 
 def get_adapter() -> DefaultOIDCAdapter:
     return import_attribute(app_settings.ADAPTER)()

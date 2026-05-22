@@ -7,6 +7,7 @@ import uuid
 from django.urls import reverse
 
 import jwt
+from oauthlib.common import Request
 from oauthlib.oauth2.rfc8628.endpoints import DeviceApplicationServer
 from oauthlib.openid import Server
 
@@ -17,9 +18,10 @@ from allauth.idp.oidc.adapter import get_adapter
 from allauth.idp.oidc.internal.oauthlib.request_validator import (
     OAuthLibRequestValidator,
 )
+from allauth.idp.oidc.internal.oauthlib.utils import get_validator_context
 
 
-def generate_opaque_token(request) -> str:
+def generate_opaque_token(request: Request) -> str:
     # 160 bit token is recommended, oauthlib uses less.
     # oauch.io -- at oautlib's default, we get:
     #    Out of 11 valid authorization responses, the
@@ -27,7 +29,7 @@ def generate_opaque_token(request) -> str:
     return secrets.token_urlsafe(64)
 
 
-def generate_jwt_access_token(request) -> str:
+def generate_jwt_access_token(request: Request) -> str:
     adapter = get_adapter()
     iat = int(time.time())
     access_token = {
@@ -39,6 +41,10 @@ def generate_jwt_access_token(request) -> str:
         "token_use": "access",  # nosec
     }
     # Client credentials has no user.
+    ctx = get_validator_context()
+    resources = ctx.requested_resources or ctx.granted_resources
+    if resources:
+        access_token["aud"] = resources
     if request.user is not None:
         access_token["sub"] = adapter.get_user_sub(request.client, request.user)
     if request.scopes:

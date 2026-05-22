@@ -7,7 +7,7 @@ from oauthlib.common import Request
 from allauth.account.models import EmailAddress
 from allauth.idp.oidc import app_settings
 from allauth.idp.oidc.adapter import get_adapter
-from allauth.idp.oidc.internal.oauthlib.utils import get_context
+from allauth.idp.oidc.internal.oauthlib.utils import get_validator_context
 from allauth.idp.oidc.models import Client
 
 
@@ -17,6 +17,7 @@ def cache_key(client_id: str, code: str) -> str:
 
 def create(client: Client, code: dict, request: Request) -> None:
     adapter = get_adapter()
+    ctx = get_validator_context()
     authorization_code = {
         "code": code,
         "client_id": client.id,
@@ -24,8 +25,9 @@ def create(client: Client, code: dict, request: Request) -> None:
         "sub": adapter.get_user_sub(client, request.user),
         "scopes": request.scopes,
         "claims": request.claims,
+        "resources": ctx.requested_resources,
     }
-    if email := getattr(request, "email", None):
+    if email := ctx.email:
         # Don't trouble ourselves with keeping track a specific email in case
         # the primary was chosen.
         if EmailAddress.objects.get_primary_email(request.user) != email.lower():
@@ -52,7 +54,7 @@ def invalidate(client_id: str, code: str) -> None:
 
 
 def validate(client_id: str, code: str, request: Request) -> bool:
-    ctx = get_context(request)
+    ctx = get_validator_context()
     authorization_code = lookup(client_id, code)
     if not authorization_code:
         return False
@@ -60,6 +62,7 @@ def validate(client_id: str, code: str, request: Request) -> bool:
     if not user:
         return False
     request.scopes = authorization_code["scopes"]
+    ctx.granted_resources = authorization_code["resources"]
     request.user = user
     pkce = authorization_code.get("pkce")
     if pkce:

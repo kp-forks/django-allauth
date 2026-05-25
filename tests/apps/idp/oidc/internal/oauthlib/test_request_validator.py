@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 from oauthlib.common import Request
 

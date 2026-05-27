@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse, urlunparse
 
 from django.forms import Form
@@ -60,7 +60,7 @@ def extract_headers(request: HttpRequest) -> dict[str, str]:
     return headers
 
 
-def convert_response(headers, body, status) -> HttpResponse:
+def convert_response(headers: dict[str, str], body: Any, status: int) -> HttpResponse:
     response: HttpResponse
     if isinstance(body, dict):
         response = JsonResponse(body, status=status)
@@ -100,7 +100,7 @@ class ValidatorContext:
     access_token: Token | None = None
     refresh_token: Token | None = None
     clients: dict[str, Client | None] = field(default_factory=dict)
-    codes: dict[tuple[str, str], dict | None] = field(default_factory=dict)
+    codes: dict[tuple[str, str], dict[str, Any] | None] = field(default_factory=dict)
     requested_resources: list[str] | None = None
     granted_resources: list[str] | None = None
 

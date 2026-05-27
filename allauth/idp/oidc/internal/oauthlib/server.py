@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import time
 import uuid
+from typing import Any
 
 from django.urls import reverse
 
@@ -58,7 +59,7 @@ def generate_jwt_access_token(request: Request) -> str:
     )
 
 
-def generate_access_token(request) -> str:
+def generate_access_token(request: Request) -> str:
     fmt = app_settings.ACCESS_TOKEN_FORMAT
     if fmt == "opaque":
         return generate_opaque_token(request)
@@ -68,12 +69,12 @@ def generate_access_token(request) -> str:
         raise ValueError(fmt)
 
 
-def generate_refresh_token(request) -> str:
+def generate_refresh_token(request: Request) -> str:
     return generate_opaque_token(request)
 
 
 class OAuthLibServer(Server):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             token_generator=generate_access_token,
             refresh_token_generator=generate_refresh_token,
@@ -98,7 +99,7 @@ class DeviceOAuthLibServer(DeviceApplicationServer):
         self._expires_in = app_settings.DEVICE_CODE_EXPIRES_IN
 
 
-def get_server(**kwargs) -> OAuthLibServer:
+def get_server(**kwargs: Any) -> OAuthLibServer:
     return OAuthLibServer(**kwargs)
 
 

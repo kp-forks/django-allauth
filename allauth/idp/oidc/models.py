@@ -24,11 +24,11 @@ def default_client_secret() -> str:
     return make_password(client_secret)
 
 
-def _values_from_text(text) -> list[str]:
+def _values_from_text(text: str) -> list[str]:
     return list(filter(None, [s.strip() for s in text.split("\n")]))
 
 
-def _values_to_text(values) -> str:
+def _values_to_text(values: list[str]) -> str:
     if isinstance(values, str):
         raise ValueError(values)
     return "\n".join(values)
@@ -153,7 +153,7 @@ class Client(models.Model):
     def set_grant_types(self, grant_types: list[str]) -> None:
         self.grant_types = _values_to_text(grant_types)
 
-    def set_secret(self, secret) -> None:
+    def set_secret(self, secret: str) -> None:
         self.secret = make_password(secret)
 
     def check_secret(self, secret: str) -> bool:
@@ -184,7 +184,7 @@ class Client(models.Model):
         return self.id
 
 
-class TokenQuerySet(models.query.QuerySet):
+class TokenQuerySet(models.query.QuerySet["Token"]):
     def valid(self) -> TokenQuerySet:
         return self.filter(
             Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
@@ -193,7 +193,7 @@ class TokenQuerySet(models.query.QuerySet):
     def by_value(self, value: str) -> TokenQuerySet:
         return self.filter(hash=get_adapter().hash_token(value))
 
-    def lookup(self, type, value) -> Token | None:
+    def lookup(self, type, value: str) -> Token | None:
         return self.valid().by_value(value).filter(type=type).first()
 
 

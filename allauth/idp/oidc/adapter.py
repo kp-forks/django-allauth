@@ -69,7 +69,11 @@ class DefaultOIDCAdapter(BaseAdapter):
         return self.request.build_absolute_uri("/").rstrip("/")
 
     def populate_id_token(
-        self, id_token: dict, client, scopes: Iterable[str], **kwargs
+        self,
+        id_token: dict[str, Any],
+        client: Client,
+        scopes: Iterable[str],
+        **kwargs: Any,
     ) -> None:
         """
         This method can be used to alter the ID token payload. It is already populated
@@ -80,12 +84,12 @@ class DefaultOIDCAdapter(BaseAdapter):
 
     def populate_access_token(
         self,
-        access_token: dict,
+        access_token: dict[str, Any],
         *,
-        client,
+        client: Client,
         scopes: Iterable[str],
         user: AbstractBaseUser,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         This method can be used to alter the JWT access token payload. It is already
@@ -97,15 +101,15 @@ class DefaultOIDCAdapter(BaseAdapter):
         self,
         purpose: Literal["id_token", "userinfo"],
         user: AbstractBaseUser,
-        client,
+        client: Client,
         scopes: Iterable[str],
         email: str | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """
         Return the claims to be included in the ID token or userinfo response.
         """
-        claims: dict = {"sub": self.get_user_sub(client, user)}
+        claims: dict[str, Any] = {"sub": self.get_user_sub(client, user)}
         if "email" in scopes:
             address: EmailAddress | None = None
             if email:
@@ -141,13 +145,13 @@ class DefaultOIDCAdapter(BaseAdapter):
                     claims[claim_key] = claim_value
         return claims
 
-    def get_user_sub(self, client, user: AbstractBaseUser) -> str:
+    def get_user_sub(self, client: Client, user: AbstractBaseUser) -> str:
         """
         Returns the "sub" (subject identifier) for the given user.
         """
         return user_id_to_str(user)
 
-    def get_user_by_sub(self, client, sub: str):
+    def get_user_by_sub(self, client: Client, sub: str) -> AbstractBaseUser | None:
         """
         Looks up a user, given its subject identifier. Returns `None` if no
         such user was found.
@@ -165,7 +169,7 @@ class DefaultOIDCAdapter(BaseAdapter):
         self,
         *,
         client: Client,
-        client_metadata: dict,
+        client_metadata: dict[str, Any],
         token: Token | None,
         bearer_token: str | None,
         **kwargs: Any,

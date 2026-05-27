@@ -246,12 +246,12 @@ class AuthorizationView(FormView):
             params["state"] = state
         return HttpResponseRedirect(add_query_params(redirect_uri, params))
 
-    def get_form_kwargs(self) -> dict:
+    def get_form_kwargs(self) -> dict[str, Any]:
         ret = super().get_form_kwargs()
         ret.update({"requested_scopes": self._scopes, "user": self.request.user})
         return ret
 
-    def get_initial(self) -> dict:
+    def get_initial(self) -> dict[str, Any]:
         signer = Signer()
         ret = {}
         request_info = self._request_info
@@ -262,7 +262,7 @@ class AuthorizationView(FormView):
         ret["request"] = signer.sign_object((self._scopes, request_info))
         return ret
 
-    def form_valid(self, form) -> HttpResponse:
+    def form_valid(self, form: AuthorizationForm) -> HttpResponse:
         orequest = extract_params(self.request)
 
         scopes = form.cleaned_data["scopes"]
@@ -287,7 +287,7 @@ class AuthorizationView(FormView):
         except errors.FatalClientError as e:
             return respond_html_error(self.request, error=e)
 
-    def get_context_data(self, **kwargs) -> dict:
+    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         ret = super().get_context_data(**kwargs)
         ret.update(
             {
@@ -304,7 +304,7 @@ authorization = AuthorizationView.as_view()
 @method_decorator(csrf_exempt, name="dispatch")
 @method_decorator(login_not_required, name="dispatch")
 class DeviceCodeView(View):
-    def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         orequest = extract_params(request)
         try:
             get_validator_context().requested_resources = get_resources(request)
@@ -410,7 +410,7 @@ class TokenView(View):
         request: HttpRequest,
         *,
         user: AbstractBaseUser | None = None,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
     ) -> HttpResponse:
         orequest = extract_params(request)
         oresponse = get_server(
@@ -419,7 +419,10 @@ class TokenView(View):
         return convert_response(*oresponse)
 
     def _pre_token(
-        self, orequest: Request, user: AbstractBaseUser | None, data: dict | None
+        self,
+        orequest: Request,
+        user: AbstractBaseUser | None,
+        data: dict[str, Any] | None,
     ) -> None:
         if orequest.grant_type == Client.GrantType.DEVICE_CODE:
             assert user is not None  # nosec
@@ -512,10 +515,10 @@ class LogoutView(FormView):
             return self._handle(form, True)
         return self.render_to_response(self.get_context_data(form=form))
 
-    def form_invalid(self, form) -> HttpResponse:
+    def form_invalid(self, form: RPInitiatedLogoutForm) -> HttpResponse:
         return respond_html_error(self.request, form=form)
 
-    def form_valid(self, form) -> HttpResponse:
+    def form_valid(self, form: RPInitiatedLogoutForm) -> HttpResponse:
         ask = self._must_ask(form)
         action = form.cleaned_data["action"]
         if ask:
@@ -585,7 +588,7 @@ logout = LogoutView.as_view()
 @method_decorator(login_not_required, name="dispatch")
 class ClientRegistrationView(View):
 
-    def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+    def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         bearer_token, token, resp = self._authorize()
         if resp:
             return resp
@@ -614,7 +617,7 @@ class ClientRegistrationView(View):
         self,
         form: ClientRegistrationForm,
         *,
-        client_metadata: dict,
+        client_metadata: dict[str, Any],
         token: Token | None,
         bearer_token: str | None,
     ) -> HttpResponse:
@@ -687,7 +690,7 @@ class ClientRegistrationView(View):
         resp["WWW-Authenticate"] = 'Bearer error="invalid_token"'
         return resp
 
-    def _get_client_metadata(self) -> dict | None:
+    def _get_client_metadata(self) -> dict[str, Any] | None:
         try:
             data = json.loads(self.request.body)
         except (json.JSONDecodeError, ValueError):
@@ -718,7 +721,7 @@ class ClientRegistrationView(View):
         self,
         *,
         client: Client,
-        client_metadata: dict,
+        client_metadata: dict[str, Any],
         token: Token | None,
         bearer_token: str | None,
     ) -> HttpResponse | None:
@@ -743,8 +746,8 @@ class ClientRegistrationView(View):
 
     def _serialize_client(
         self, client: Client, form: ClientRegistrationForm, secret: str
-    ) -> dict:
-        data = {
+    ) -> dict[str, Any]:
+        data: dict[str, Any] = {
             "client_id": client.id,
             "client_name": client.name,
             "token_endpoint_auth_method": form.cleaned_data[

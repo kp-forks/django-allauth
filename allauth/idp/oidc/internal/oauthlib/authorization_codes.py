@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django.core.cache import cache
 
 from oauthlib.common import Request
@@ -15,7 +17,7 @@ def cache_key(client_id: str, code: str) -> str:
     return f"allauth.idp.oidc.authorization_code[{client_id}:{code}]"
 
 
-def create(client: Client, code: dict, request: Request) -> None:
+def create(client: Client, code: dict[str, Any], request: Request) -> None:
     adapter = get_adapter()
     ctx = get_validator_context()
     authorization_code = {
@@ -45,7 +47,7 @@ def create(client: Client, code: dict, request: Request) -> None:
     )
 
 
-def lookup(client_id: str, code: str) -> dict | None:
+def lookup(client_id: str, code: str) -> dict[str, Any] | None:
     return cache.get(cache_key(client_id, code))
 
 

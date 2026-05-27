@@ -1,3 +1,15 @@
+Unreleased
+**********
+
+Fixes
+-----
+
+- The ``password2`` (password confirmation) field on the set/change/reset
+  password forms now carries ``autocomplete="new-password"``, matching
+  ``password1``. This allows browser and password manager "suggest strong
+  password" features to fill both fields as a pair.
+
+
 65.18.0 (unreleased)
 ********************
 

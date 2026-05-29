@@ -1,16 +1,4 @@
-Unreleased
-**********
-
-Fixes
------
-
-- The ``password2`` (password confirmation) field on the set/change/reset
-  password forms now carries ``autocomplete="new-password"``, matching
-  ``password1``. This allows browser and password manager "suggest strong
-  password" features to fill both fields as a pair.
-
-
-65.18.0 (unreleased)
+65.18.0 (2026-05-29)
 ********************
 
 .. note::
@@ -19,9 +7,13 @@ Fixes
     Please consider supporting its continued development by becoming a sponsor at
     https://allauth.org/sponsors/. Your support helps keep this project thriving!
 
-
 Note worthy changes
 -------------------
+
+- The ``password2`` (password confirmation) field on the set/change/reset
+  password forms now carries ``autocomplete="new-password"``, matching
+  ``password1``. This allows browser and password manager "suggest strong
+  password" features to fill both fields as a pair.
 
 - IdP: Added support for Dynamic Client Registration.
 

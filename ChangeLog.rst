@@ -29,6 +29,13 @@ Note worthy changes
 
 - IdP: Added support for Resource Indicators (RFC 8707).
 
+- IdP: The ``.well-known/openid-configuration`` endpoint previously derived
+  ``response_types_supported`` and ``grant_types_supported`` from configured
+  clients. Per RFC 8414, these fields should reflect server capabilities, not
+  the configuration of existing clients. They are now statically derived.
+  Additionally, ``scopes_supported`` is now included. Use the new
+  ``populate_server_metadata()`` adapter method to customize the metadata.
+
 
 65.17.0 (2026-05-20)
 ********************

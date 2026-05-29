@@ -220,7 +220,14 @@ class ClientRegistrationForm(forms.Form):
         return grant_types
 
     def clean_response_types(self) -> list[str]:
-        return self._clean_string_list("response_types") or ["code"]
+        response_types = self._clean_string_list("response_types") or ["code"]
+        valid = {rt.value for rt in Client.ResponseType}
+        invalid = set(response_types) - valid
+        if invalid:
+            raise forms.ValidationError(
+                f"Unsupported response type(s): {', '.join(sorted(invalid))}"
+            )
+        return response_types
 
     def clean_scope(self) -> list[str]:
         value = self.cleaned_data.get("scope", "")

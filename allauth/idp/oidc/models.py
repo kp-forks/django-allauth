@@ -41,6 +41,16 @@ class Client(models.Model):
         CLIENT_CREDENTIALS = "client_credentials", _("Client credentials")
         REFRESH_TOKEN = "refresh_token", _("Refresh token")
 
+    class ResponseType(models.TextChoices):
+        CODE = "code", _("Code")
+        TOKEN = "token", _("Token")
+        ID_TOKEN = "id_token", _("ID token")
+        ID_TOKEN_TOKEN = "id_token token", _("ID token token")
+        CODE_TOKEN = "code token", _("Code token")
+        CODE_ID_TOKEN = "code id_token", _("Code ID token")
+        CODE_ID_TOKEN_TOKEN = "code id_token token", _("Code ID token token")
+        NONE = "none", _("None")
+
     class Type(models.TextChoices):
         CONFIDENTIAL = "confidential", _("Confidential")
         PUBLIC = "public", _("Public")

@@ -195,6 +195,16 @@ class DefaultOIDCAdapter(BaseAdapter):
         """
         pass
 
+    def populate_server_metadata(self, data: dict[str, str | list[str]]) -> None:
+        """
+        Allows for customizing the ``/.well-known/openid-configuration``
+        payload, as specified in `RFC 8414`_ (OAuth 2.0 Authorization Server
+        Metadata).
+
+        .. _RFC 8414: https://www.rfc-editor.org/info/rfc8414
+        """
+        pass
+
 
 def get_adapter() -> DefaultOIDCAdapter:
     return import_attribute(app_settings.ADAPTER)()

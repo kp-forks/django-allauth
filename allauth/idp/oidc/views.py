@@ -119,19 +119,17 @@ class ConfigurationView(View):
             data["registration_endpoint"] = build_absolute_uri(
                 request, reverse("idp:oidc:client_registration")
             )
+
+        get_adapter().populate_server_metadata(data)
         response = JsonResponse(data)
         response["Access-Control-Allow-Origin"] = "*"
         return response
 
     def _get_supported_types(self) -> dict[str, list[str]]:
-        grant_types = set()
-        response_types = set()
-        for client in Client.objects.only("response_types", "grant_types").iterator():
-            response_types.update(client.get_response_types())
-            grant_types.update(client.get_grant_types())
         return {
-            "grant_types_supported": list(sorted(grant_types)),
-            "response_types_supported": list(sorted(response_types)),
+            "scopes_supported": ["openid", "profile", "email"],
+            "grant_types_supported": sorted(gt.value for gt in Client.GrantType),
+            "response_types_supported": sorted(rt.value for rt in Client.ResponseType),
         }
 
 

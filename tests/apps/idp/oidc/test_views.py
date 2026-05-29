@@ -252,7 +252,16 @@ def test_configuration_view(
             "id_token_signing_alg_values_supported": ["RS256"],
             "issuer": "http://testserver",
             "jwks_uri": "http://testserver/.well-known/jwks.json",
-            "response_types_supported": ["code", "token"],
+            "response_types_supported": [
+                "code",
+                "code id_token",
+                "code id_token token",
+                "code token",
+                "id_token",
+                "id_token token",
+                "none",
+                "token",
+            ],
             "revocation_endpoint": "http://testserver/identity/o/api/revoke",
             "subject_types_supported": ["public"],
             "token_endpoint": "http://testserver/identity/o/api/token",
@@ -261,6 +270,7 @@ def test_configuration_view(
                 "client_secret_basic",
                 "client_secret_post",
             ],
+            "scopes_supported": ["openid", "profile", "email"],
             "userinfo_endpoint": (
                 "https://remote/userinfo"
                 if custom_userinfo_endpoint

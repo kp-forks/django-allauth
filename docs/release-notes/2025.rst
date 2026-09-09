@@ -353,6 +353,15 @@ Fixes
   you could run into a ``MultipleObjectsReturned``. Fixed.
 
 
+Security notice
+---------------
+
+- When both username and email login were enabled, authentication by
+  email/password remained vulnerable to account enumeration by means of a
+  timing attack. This affected versions 65.3.0 through 65.4.1. Thanks to Yuji
+  Egami for reporting.
+
+
 65.4.1 (2025-02-07)
 *******************
 

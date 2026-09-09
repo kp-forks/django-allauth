@@ -9,6 +9,7 @@ from allauth.account.adapter import get_adapter as get_account_adapter
 from allauth.account.internal.flows.reauthentication import (
     raise_if_reauthentication_required,
 )
+from allauth.core.internal.httpkit import authenticated_user
 from allauth.mfa import app_settings, signals
 from allauth.mfa.models import Authenticator
 from allauth.mfa.recovery_codes.internal.auth import RecoveryCodes
@@ -22,23 +23,35 @@ def can_generate_recovery_codes(user: AbstractBaseUser) -> bool:
     )
 
 
+@transaction.atomic
 def generate_recovery_codes(request: HttpRequest) -> Authenticator:
     raise_if_reauthentication_required(request)
-    assert request.user.is_authenticated  # nosec
+    user = authenticated_user(request)
+
+    # NOTE: We need a lock to prevent a race on creating recovery codes. However, the
+    # authenticator is deleted below, so we cannot lock on that.  Using the user
+    # row instead...
+    user.__class__._default_manager.select_for_update().get(pk=user.pk)
+    # (end NOTE)
+
     Authenticator.objects.filter(
-        user=request.user, type=Authenticator.Type.RECOVERY_CODES
+        user_id=user.pk, type=Authenticator.Type.RECOVERY_CODES
     ).delete()
-    rc_auth = RecoveryCodes.activate(request.user)
+    rc_auth = RecoveryCodes.activate(user)
     authenticator = rc_auth.instance
-    add_codes_generated_message(request)
-    signals.authenticator_reset.send(
-        sender=Authenticator,
-        request=request,
-        user=request.user,
-        authenticator=authenticator,
-    )
     adapter = get_account_adapter(request)
-    adapter.send_notification_mail("mfa/email/recovery_codes_generated", request.user)
+
+    def on_commit() -> None:
+        add_codes_generated_message(request)
+        signals.authenticator_reset.send(
+            sender=Authenticator,
+            request=request,
+            user=user,
+            authenticator=authenticator,
+        )
+        adapter.send_notification_mail("mfa/email/recovery_codes_generated", user)
+
+    transaction.on_commit(on_commit)
     return authenticator
 
 

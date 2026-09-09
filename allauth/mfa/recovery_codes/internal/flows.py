@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.auth.base_user import AbstractBaseUser
+from django.db import transaction
 from django.http import HttpRequest
 
 from allauth.account.adapter import get_adapter as get_account_adapter
@@ -74,13 +75,17 @@ def auto_generate_recovery_codes(request: HttpRequest) -> Authenticator | None:
     if has_rc:
         return None
     rc = RecoveryCodes.activate(request.user)
-    signals.authenticator_added.send(
-        sender=Authenticator,
-        request=request,
-        user=request.user,
-        authenticator=rc.instance,
-    )
-    add_codes_generated_message(request)
+
+    def on_commit() -> None:
+        signals.authenticator_added.send(
+            sender=Authenticator,
+            request=request,
+            user=request.user,
+            authenticator=rc.instance,
+        )
+        add_codes_generated_message(request)
+
+    transaction.on_commit(on_commit)
     return rc.instance
 
 

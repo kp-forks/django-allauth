@@ -227,7 +227,7 @@ def test_flow(
         )
 
 
-@pytest.mark.parametrize("stateful,query_count", [(False, 0), (True, 3)])
+@pytest.mark.parametrize("stateful,query_count", [(False, 0), (True, 2)])
 @pytest.mark.parametrize(
     "url",
     [

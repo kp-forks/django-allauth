@@ -8,10 +8,14 @@
     https://allauth.org/sponsors/. Your support helps keep this project thriving!
 
 
-Note worthy changes
--------------------
+Security notice
+---------------
 
-- ...
+- Headless: When ``HEADLESS_JWT_STATEFUL_VALIDATION_ENABLED`` is on, JWT
+  access tokens are now rejected after the password changes outside of the
+  allauth password-change flow (for example via ``set_password()`` in a
+  shell). Stateful validation now uses the same session auth hash check that
+  refresh tokens already used.
 
 
 65.19.2 (2026-09-01)
@@ -22,7 +26,6 @@ Fixes
 
 - Headless: Posting a well-formed JSON payload that was not an object (e.g. a
   list or a string) to the headless endpoints resulted in a server error.
-
 
 Security notice
 ---------------

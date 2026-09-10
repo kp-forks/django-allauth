@@ -77,9 +77,10 @@ Available settings:
   Specifies the HTTP Authorization header scheme for access tokens, e.g.: ``Authorization: Bearer <access-token>``.
 
 ``HEADLESS_JWT_STATEFUL_VALIDATION_ENABLED`` (default: ``False``)
-  When enabled, it is validated that the access token still belongs to an
-  active session. As a result, logging out will immediately invalidate the
-  access token.
+  When enabled, access tokens are checked against the session in which they
+  were issued. The session must still exist and remain valid. As a result,
+  logging out or changing the password will immediately invalidate the access
+  token.
 
 ``HEADLESS_JWT_ROTATE_REFRESH_TOKEN`` (default: ``True``)
   When enabled, refreshing the access token results in a new refresh token

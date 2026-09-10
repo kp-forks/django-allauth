@@ -14,6 +14,8 @@ Fixes
   honor the database selected using ``migrate --database``, potentially querying
   or updating the default database instead. Fixed.
 
+- MFA: Fixed various race conditions involving TOTP and recovery codes.
+
 
 Security notice
 ---------------

@@ -7,6 +7,13 @@
     Please consider supporting its continued development by becoming a sponsor at
     https://allauth.org/sponsors/. Your support helps keep this project thriving!
 
+Fixes
+-----
+
+- Account: The email address data migrations (``0006`` and ``0008``) did not
+  honor the database selected using ``migrate --database``, potentially querying
+  or updating the default database instead. Fixed.
+
 
 Security notice
 ---------------

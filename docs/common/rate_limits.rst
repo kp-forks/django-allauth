@@ -61,18 +61,24 @@ Configuration
     Examples: ``"CF-Connecting-IP"`` (Cloudflare), ``"X-Real-IP"`` (nginx).
 
 
-Implementation Notes
---------------------
+Deployment Requirements
+-----------------------
 
-The builtin rate limitting relies on a cache and uses non-atomic operations,
-making it vulnerable to race conditions. As a result, users may occasionally
-bypass the intended rate limit due to concurrent access. However, such race
-conditions are rare in practice. For example, if the limit is set to 10 requests
-per minute and a large number of parallel processes attempt to test that limit,
-you may occasionally observe slight overruns—such as 11 or 12 requests slipping
-through. Nevertheless, exceeding the limit by a large margin is highly unlikely
-due to the low probability of many processes entering the critical non-atomic
-code section simultaneously.
+The built-in rate limiter stores its state in the Django cache. For reliable
+enforcement, the following requirements apply:
+
+- **MUST:** The configured cache must be shared by all worker processes. For
+  example, ``LocMemCache`` is process-local and therefore cannot enforce rate
+  limits across multi-process web workers.
+
+- **MUST:** The cache must have sufficient capacity to prevent rate-limit
+  entries from being evicted before their timeout. Eviction discards the
+  recorded request history and can therefore reset a rate limit prematurely.
+
+- **SHOULD:** The cache backend should implement ``cache.add()`` atomically and
+  provide strongly consistent reads. Without these guarantees, rate limiting
+  still works, but a high volume of concurrent requests may exceed the
+  configured limits.
 
 
 Testing

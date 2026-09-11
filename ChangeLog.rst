@@ -26,6 +26,13 @@ Security notice
   shell). Stateful validation now uses the same session auth hash check that
   refresh tokens already used.
 
+- A known flaw in the built-in rate limiting was that the configured limits
+  could be exceeded under a high volume of concurrent requests. This was
+  documented as an acceptably small margin of error. However, as Kaya Emre Arikan
+  (kemrec) demonstrated, the limits could be substantially exceeded under a
+  sufficiently high volume of concurrent requests. This is now fixed by
+  serializing rate limit updates.
+
 
 65.19.2 (2026-09-01)
 ********************

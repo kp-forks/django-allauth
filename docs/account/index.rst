@@ -5,6 +5,7 @@ Regular Accounts
 
    introduction
    configuration
+   usernames
    rate_limits
    views
    templates

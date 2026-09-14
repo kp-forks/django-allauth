@@ -9,9 +9,10 @@ from django.http import HttpRequest
 
 from allauth.account.adapter import get_adapter
 from allauth.account.app_settings import LoginMethod
+from allauth.account.internal.userkit import get_user_by_username
 
 from . import app_settings
-from .utils import filter_users_by_email, filter_users_by_username
+from .utils import filter_users_by_email
 
 
 _stash = local()
@@ -80,7 +81,7 @@ class AuthenticationBackend(ModelBackend):
             or not username
         ):
             return None
-        user = filter_users_by_username(username).first()
+        user = get_user_by_username(username)
         return self._check_password(user, password)
 
     def _authenticate_by_email(

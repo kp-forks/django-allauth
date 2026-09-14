@@ -10,6 +10,10 @@ Otherwise, install using::
 
     pip install "django-allauth[socialaccount]"
 
+When configuring authentication backends, review the :doc:`Django admin
+guidance <../common/admin>` and :doc:`username collation requirements
+<../account/usernames>`.
+
 Then, assuming you have a Django project up and running, add the following to
 the ``settings.py`` of your project::
 
@@ -30,14 +34,10 @@ the ``settings.py`` of your project::
         },
     ]
 
+    # Do not add ModelBackend solely for username login in Django admin;
+    # its login view is not rate limited.
     AUTHENTICATION_BACKENDS = [
-        ...
-        # Needed to login by username in Django admin, regardless of `allauth`
-        'django.contrib.auth.backends.ModelBackend',
-
-        # `allauth` specific authentication methods, such as login by email
         'allauth.account.auth_backends.AuthenticationBackend',
-        ...
     ]
 
     INSTALLED_APPS = [

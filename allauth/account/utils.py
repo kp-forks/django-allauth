@@ -6,13 +6,12 @@ from collections import OrderedDict
 from django.contrib.auth import REDIRECT_FIELD_NAME, get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
-from django.db.models import Q
 from django.http import HttpRequest
 from django.utils.http import base36_to_int, int_to_base36
 
 from allauth.account import app_settings
 from allauth.account.adapter import get_adapter
-from allauth.account.internal import flows
+from allauth.account.internal import flows, userkit
 from allauth.account.internal.emailkit import valid_email_or_none
 from allauth.account.internal.userkit import default_user_display  # noqa
 from allauth.account.internal.userkit import user_display  # noqa
@@ -242,24 +241,9 @@ def setup_user_email(request: HttpRequest, user: AbstractBaseUser, addresses):
 
 
 def filter_users_by_username(*username) -> models.QuerySet[AbstractBaseUser]:
-    if app_settings.PRESERVE_USERNAME_CASING:
-        qlist = [
-            Q(**{f"{app_settings.USER_MODEL_USERNAME_FIELD}__iexact": u})
-            for u in username
-        ]
-        q = qlist[0]
-        for q2 in qlist[1:]:
-            q = q | q2
-        ret = get_user_model()._default_manager.filter(q)
-    else:
-        ret = get_user_model()._default_manager.filter(
-            **{
-                f"{app_settings.USER_MODEL_USERNAME_FIELD}__in": [
-                    u.lower() for u in username
-                ]
-            }
-        )
-    return ret
+    """Return username candidates according to the database collation."""
+    # TODO: We need to deprecate this method.
+    return userkit.filter_users_by_username(*username)
 
 
 def filter_users_by_email(

@@ -4,6 +4,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractBaseUser
 from django.core.exceptions import FieldDoesNotExist
+from django.db import models
+from django.db.models import Q
 from django.utils.encoding import force_str
 
 from allauth.account import app_settings
@@ -82,3 +84,37 @@ def user_email(user: AbstractBaseUser, *args, commit=False):
     if ret:
         ret = ret.lower()
     return ret
+
+
+def filter_users_by_username(*username) -> models.QuerySet[AbstractBaseUser]:
+    """Return matching users according to the DB collation rules."""
+    if app_settings.PRESERVE_USERNAME_CASING:
+        qlist = [
+            Q(**{f"{app_settings.USER_MODEL_USERNAME_FIELD}__iexact": u})
+            for u in username
+        ]
+        q = qlist[0]
+        for q2 in qlist[1:]:
+            q = q | q2
+        ret = get_user_model()._default_manager.filter(q)
+    else:
+        ret = get_user_model()._default_manager.filter(
+            **{
+                f"{app_settings.USER_MODEL_USERNAME_FIELD}__in": [
+                    u.lower() for u in username
+                ]
+            }
+        )
+    return ret
+
+
+def get_user_by_username(username: str) -> AbstractBaseUser | None:
+    """Returns the user in a DB collation safe manner."""
+    users = filter_users_by_username(username)
+    ci_users = [
+        user
+        for user in users
+        if (stored_username := user_username(user)) is not None
+        and stored_username.lower() == username.lower()
+    ]
+    return ci_users[0] if len(ci_users) == 1 else None

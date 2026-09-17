@@ -11,14 +11,15 @@
 Security notice
 ---------------
 
-- Account: On databases with accent-insensitive username collations (e.g. common
-  MySQL/MariaDB configurations), usernames such as ``admin`` and ``ádmin`` could
-  authenticate the same account while consuming different rate limit keys. This
-  resulted in a larger than intended per account rate limit.  To mitigate,
-  matching rows are now checked against the submitted username before the
-  password is verified. Projects using username authentication must remove
-  Django's ``ModelBackend`` from ``AUTHENTICATION_BACKENDS``, as it does not
-  perform this additional check. Thanks to Yuji Egami for reporting.
+- Account: On databases with broad Unicode collations (e.g. common MySQL/MariaDB
+  configurations), usernames such as ``admin`` and ``ádmin``, or email addresses
+  containing compatibility characters, could authenticate the same account while
+  consuming different rate limit keys. This resulted in a larger than intended
+  per account rate limit. To mitigate, matching rows are now checked against the
+  submitted username or email address before the password is verified. On these
+  configurations, projects using username authentication must remove Django's
+  ``ModelBackend`` from ``AUTHENTICATION_BACKENDS``, as it does not perform this
+  additional check.  Thanks to Yuji Egami for reporting.
 
 
 65.19.3 (2026-09-11)

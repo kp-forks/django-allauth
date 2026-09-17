@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import unicodedata
+from collections.abc import Callable
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractBaseUser
@@ -118,3 +121,63 @@ def get_user_by_username(username: str) -> AbstractBaseUser | None:
         and stored_username.lower() == username.lower()
     ]
     return ci_users[0] if len(ci_users) == 1 else None
+
+
+def unicode_ci_compare(s1: str, s2: str) -> bool:
+    """
+    Perform case-insensitive comparison of two identifiers, using the
+    recommended algorithm from Unicode Technical Report 36, section
+    2.11.2(B)(2).
+    """
+    norm_s1 = unicodedata.normalize("NFKC", s1).casefold()
+    norm_s2 = unicodedata.normalize("NFKC", s2).casefold()
+    return norm_s1 == norm_s2
+
+
+def filter_users_by_email(
+    email: str,
+    *,
+    is_active: bool | None = None,
+    prefer_verified: bool = False,
+    for_login: bool = False,
+) -> list:
+    """Return list of users by email address
+
+    Typically one, at most just a few in length.  First we look through
+    EmailAddress table, than customisable User model table. Add results
+    together avoiding SQL joins and deduplicate.
+
+    `prefer_verified`: When looking up users by email, there can be cases where
+    users with verified email addresses are preferable above users who did not
+    verify their email address. The password reset is such a use case -- if
+    there is a user with a verified email than that user should be returned, not
+    one of the other users.
+    """
+    from allauth.account.models import EmailAddress
+
+    compare: Callable[[str, str], bool]
+    compare = (lambda a, b: a.lower() == b.lower()) if for_login else unicode_ci_compare
+
+    User = get_user_model()
+    email = email.lower()
+    mails = list(EmailAddress.objects.filter(email=email).select_related("user"))
+    mails = [e for e in mails if compare(e.email, email)]
+    is_verified = False
+    if prefer_verified:
+        verified_mails = list(filter(lambda e: e.verified, mails))
+        if verified_mails:
+            mails = verified_mails
+            is_verified = True
+    users = []
+    for e in mails:
+        users.append(e.user)
+    if app_settings.USER_MODEL_EMAIL_FIELD and not is_verified:
+        q_dict = {app_settings.USER_MODEL_EMAIL_FIELD: email}
+        user_qs = User.objects.filter(**q_dict)
+        for user in user_qs.iterator(2000):
+            user_email = getattr(user, app_settings.USER_MODEL_EMAIL_FIELD)
+            if compare(user_email, email):
+                users.append(user)
+    if is_active is not None:
+        users = [u for u in set(users) if u.is_active == is_active]
+    return list(set(users))

@@ -8,21 +8,17 @@
     https://allauth.org/sponsors/. Your support helps keep this project thriving!
 
 
-Note worthy changes
--------------------
+Security notice
+---------------
 
-- ...
+- Headless: ``X-Session-Token`` authentication for your own APIs (DRF / Ninja)
+  now uses Django's standard session auth hash check. A token is rejected after
+  the password changes outside of the allauth password-change flow, instead of
+  still loading the user by primary key while the session row exists.
 
 
 65.19.4 (2026-09-17)
 ********************
-
-.. note::
-
-    💙 **Is django-allauth's authentication the entrance to your business?**
-    Please consider supporting its continued development by becoming a sponsor at
-    https://allauth.org/sponsors/. Your support helps keep this project thriving!
-
 
 Security notice
 ---------------

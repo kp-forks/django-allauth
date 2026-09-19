@@ -7,7 +7,9 @@ Introduction
 When using allauth headless in non-browser contexts, such as mobile apps, a
 session token is used to keep track of the authentication state. This session
 token is handed over by the app by providing the ``X-Session-Token`` request
-header.
+header. The token is only accepted while the Django session still authenticates
+the user using Django's standard session auth hash check. Logging out or changing
+the password therefore invalidates it immediately.
 
 If you do not have any requirements that prescribe a specific token strategy,
 the simplest way forward is to use the ``X-Session-Token`` authentication

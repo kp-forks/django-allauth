@@ -1,3 +1,19 @@
+65.19.5 (unreleased)
+********************
+
+.. note::
+
+    💙 **Is django-allauth's authentication the entrance to your business?**
+    Please consider supporting its continued development by becoming a sponsor at
+    https://allauth.org/sponsors/. Your support helps keep this project thriving!
+
+
+Note worthy changes
+-------------------
+
+- ...
+
+
 65.19.4 (2026-09-17)
 ********************
 

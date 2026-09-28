@@ -11,6 +11,11 @@
 Security notice
 ---------------
 
+- Account: When the potentially unsafe ``ALLOWED_HOSTS = ["*"]`` configuration
+  was used, arbitrary redirect URLs were considered safe, allowing open
+  redirects. The wildcard is now ignored when validating redirect
+  destinations. Thanks to John Tipton and Yuji Egami for reporting.
+
 - Headless: ``X-Session-Token`` authentication for your own APIs (DRF / Ninja)
   now uses Django's standard session auth hash check. A token is rejected after
   the password changes outside of the allauth password-change flow, instead of
